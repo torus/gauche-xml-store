@@ -13,9 +13,6 @@
 
 ;; seed (id-stack . proc)
 
-#;(define (set-parent! db id parent-id)
-  (print `(set-parent! ,id ,parent-id)))
-
 (define (set-next-sibling! db id sibling-id)
   (let1 data (assoc-set! (read-from-string (dbm-get db id)) 'next-sibling sibling-id)
     (dbm-put! db id (write-to-string data)))
@@ -36,7 +33,7 @@
           (proc (cdr seed)))
       (add-element! db id elem-gi parent-id attributes)
       (proc id)
-      (cons (cons id (car seed)) (lambda (child) #;(set-parent! db child id))))))
+      (cons (cons id (car seed)) (lambda (child) )))))
 
 (define (eat-finish-element db)
   (lambda (elem-gi attributes namespaces parent-seed seed)
@@ -45,7 +42,6 @@
       ;; (print `(/ ,id ,elem-gi parent: ,parent-id))
       (cons (car parent-seed)
             (lambda (sibling)
-              #;(set-parent! db sibling parent-id)
               (set-next-sibling! db id sibling))))))
 
 (define (p db new-id)
