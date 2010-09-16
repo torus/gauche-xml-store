@@ -1,3 +1,4 @@
+(use util.list)
 (use text.tree)
 (use sxml.tools)
 (use sxml.ssax)
@@ -8,7 +9,7 @@
   (let ((i 0))
     (lambda ()
       (inc! i)
-      i)))
+      (number->string i))))
 
 ;; seed (id-stack . proc)
 
@@ -16,9 +17,16 @@
   (print `(set-parent! ,id ,parent-id)))
 
 (define (set-next-sibling! db id sibling-id)
+  (let1 data (assoc-set! (read-from-string (dbm-get db id)) 'next-sibling sibling-id)
+    (dbm-put! db id (write-to-string data)))
   (print `(set-next-sibling! ,id ,sibling-id)))
 
 (define (add-element! db id elem-gi parent-id attributes)
+  (let1 data (list (cons 'id id)
+                   (cons 'elem-gi elem-gi)
+                   (cons 'parent parent-id)
+                   (cons 'attributes attributes))
+    (dbm-put! db id (write-to-string data)))
   (print `(add-element! ,id ,elem-gi <- ,parent-id ,attributes)))
 
 (define (eat-new-level-seed db new-id)
@@ -51,7 +59,8 @@
 (define doc
   (sxml:sxml->xml '(a (b (c)) (d (@ (a 123))) (e))))
 
-((p () (make-new-id))
+((p (dbm-open <fsdbm> :path "hoge" :rw-mode :write)
+    (make-new-id))
  (open-input-string (tree->string doc))
  (cons (list 'TOP)
        (lambda (id) (print `(TOP ,id)))))
