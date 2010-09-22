@@ -41,6 +41,12 @@
                     (dbm-put! db id (write-to-string data2)))
                   )))))))
 
+(define (eat-char-data new-level-handler finish-elem-handler)
+  (lambda (string1 string2 seed)
+    (let* ((attr `((content . ,string1)))
+           (new-seed (new-level-handler '*TEXT* attr () () seed)))
+      (finish-elem-handler '*TEXT* attr () seed new-seed))))
+
 (define (eat-finish-element db)
   (lambda (elem-gi attributes namespaces parent-seed seed)
     (let ((id (car (car seed)))
@@ -51,15 +57,20 @@
               (set-next-sibling! db id sibling))))))
 
 (define (p db new-id)
-  (ssax:make-parser
-   NEW-LEVEL-SEED (eat-new-level-seed db new-id)
-   FINISH-ELEMENT (eat-finish-element db)
-   CHAR-DATA-HANDLER (lambda (string1 string2 seed)
-                       seed)
-   ))
+  (let ((new-level (eat-new-level-seed db new-id))
+        (finish-elem (eat-finish-element db)))
+    (ssax:make-parser
+     NEW-LEVEL-SEED new-level
+     FINISH-ELEMENT finish-elem
+     CHAR-DATA-HANDLER (eat-char-data new-level finish-elem)
+     )))
 
 (define doc
-  (sxml:sxml->xml '(a (b (c)) (d (@ (a 123))) (e))))
+  (sxml:sxml->xml '(a (b "text content"
+                         (c))
+                      (d (@ (a 123))
+                         "another content")
+                      (e))))
 
 ((p (dbm-open <fsdbm> :path "hoge" :rw-mode :write)
     (make-new-id))
