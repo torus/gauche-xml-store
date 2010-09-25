@@ -16,7 +16,7 @@
 (define (set-next-sibling! db id sibling-id)
   (let1 data (assoc-set! (read-from-string (dbm-get db id)) 'next-sibling sibling-id)
     (dbm-put! db id (write-to-string data)))
-  (print `(set-next-sibling! ,id ,sibling-id)))
+  #;(print `(set-next-sibling! ,id ,sibling-id)))
 
 (define (add-element! db id elem-gi parent-id attributes)
   (let1 data (list (cons 'id id)
@@ -24,7 +24,7 @@
                    (cons 'parent parent-id)
                    (cons 'attributes attributes))
     (dbm-put! db id (write-to-string data)))
-  (print `(add-element! ,id ,elem-gi <- ,parent-id ,attributes)))
+  #;(print `(add-element! ,id ,elem-gi <- ,parent-id ,attributes)))
 
 (define (eat-new-level-seed db new-id)
   (lambda (elem-gi attributes namespaces expected-content seed)
@@ -41,11 +41,13 @@
                     (dbm-put! db id (write-to-string data2)))
                   )))))))
 
-(define (eat-char-data new-level-handler finish-elem-handler)
+(define (eat-char-data output new-level-handler finish-elem-handler)
   (lambda (string1 string2 seed)
-    (let* ((attr `((content . ,string1)))
-           (new-seed (new-level-handler '*TEXT* attr () () seed)))
-      (finish-elem-handler '*TEXT* attr () seed new-seed))))
+    (let-values (((pos len) (output string1)))
+      (let* ((attr `((position . ,pos)
+                     (length . ,len)))
+             (new-seed (new-level-handler '*TEXT* attr () () seed)))
+        (finish-elem-handler '*TEXT* attr () seed new-seed)))))
 
 (define (eat-finish-element db)
   (lambda (elem-gi attributes namespaces parent-seed seed)
@@ -56,14 +58,24 @@
             (lambda (sibling)
               (set-next-sibling! db id sibling))))))
 
+(define (make-output-proc port)
+  (let1 cur 0
+    (lambda (text)
+      (let ((len (string-length text))
+            (prevpos cur))
+        (display text port)
+        (set! cur (+ cur len))
+        (values prevpos len)))))
+
 (define (p db new-id)
   (let ((new-level (eat-new-level-seed db new-id))
         (finish-elem (eat-finish-element db)))
-    (ssax:make-parser
-     NEW-LEVEL-SEED new-level
-     FINISH-ELEMENT finish-elem
-     CHAR-DATA-HANDLER (eat-char-data new-level finish-elem)
-     )))
+    (let1 char-data (eat-char-data (make-output-proc (current-output-port)) new-level finish-elem)
+      (ssax:make-parser
+       NEW-LEVEL-SEED new-level
+       FINISH-ELEMENT finish-elem
+       CHAR-DATA-HANDLER char-data
+       ))))
 
 (define doc
   (sxml:sxml->xml '(a (b "text content"
@@ -76,4 +88,4 @@
     (make-new-id))
  (open-input-string (tree->string doc))
  (cons (list 'TOP)
-       (lambda (id) (print `(TOP ,id)))))
+       (lambda (id) #;(print `(TOP ,id)))))
