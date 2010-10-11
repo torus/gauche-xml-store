@@ -3,7 +3,8 @@
 (use sxml.tools)
 (use sxml.ssax)
 (use dbm)
-(use dbm.fsdbm)
+(use dbm.gdbm)
+(use gauche.parseopt)
 
 (define (make-new-id)
   (let ((i 0))
@@ -67,25 +68,35 @@
         (set! cur (+ cur len))
         (values prevpos len)))))
 
-(define (p db new-id)
+(define (p db text-out-port new-id)
   (let ((new-level (eat-new-level-seed db new-id))
         (finish-elem (eat-finish-element db)))
-    (let1 char-data (eat-char-data (make-output-proc (current-output-port)) new-level finish-elem)
+    (let1 char-data (eat-char-data (make-output-proc text-out-port) new-level finish-elem)
       (ssax:make-parser
        NEW-LEVEL-SEED new-level
        FINISH-ELEMENT finish-elem
        CHAR-DATA-HANDLER char-data
        ))))
 
-(define doc
-  (sxml:sxml->xml '(a (b "text content"
-                         (c))
-                      (d (@ (a 123))
-                         "another content")
-                      (e))))
+;; (define doc
+;;   (sxml:sxml->xml '(a (b "text content"
+;;                          (c))
+;;                       (d (@ (a 123))
+;;                          "another content")
+;;                       (e))))
 
-((p (dbm-open <fsdbm> :path "hoge" :rw-mode :write)
-    (make-new-id))
- (open-input-string (tree->string doc))
- (cons (list 'TOP)
-       (lambda (id) #;(print `(TOP ,id)))))
+(define (main args)
+  (let-args (cdr args)
+      ((outfile "o|outfile=s")
+       . inputs)
+    (let ((filename (or outfile "a"))
+          (new-id (make-new-id)))
+      ((p (dbm-open <gdbm> :path (string-append filename ".gdbm") :rw-mode :write)
+          (open-output-file (string-append filename ".txt"))
+          new-id)
+       ;(open-input-string (tree->string doc))
+       (open-input-file (car inputs))
+       (cons (list 'TOP)
+             (lambda (id))))
+      (display (format #f #`",(- (string->number (new-id)) 1) elements") (current-error-port))
+      )))
